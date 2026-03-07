@@ -22,13 +22,25 @@ namespace Saller_System.Services
             await _db.Table<Satis>()
                      .Where(s => s.Tarih < otuzGunOnce)
                      .DeleteAsync();
+            await _db!.CreateTableAsync<Kullanici>();
+
+            // Varsayılan kullanıcıları ekle (ilk çalıştırmada)
+            var adminVar = await _db!.Table<Kullanici>()
+                .Where(k => k.KullaniciAdi == "admin").FirstOrDefaultAsync();
+
+            if (adminVar == null)
+            {
+                await _db!.InsertAsync(new Kullanici { KullaniciAdi = "admin", Sifre = "1234", Rol = "Admin" });
+                await _db!.InsertAsync(new Kullanici { KullaniciAdi = "yonetici", Sifre = "1234", Rol = "Yonetici" });
+                await _db!.InsertAsync(new Kullanici { KullaniciAdi = "kasiyer", Sifre = "1234", Rol = "Calisan" });
+            }
         }
 
         // ── ÜRÜN İŞLEMLERİ ──────────────────────────
         public async Task<List<Urun>> TumUrunleriGetirAsync()
       => await _db!.Table<Urun>().ToListAsync();
 
-        public async Task<Urun> BarkodIleGetirAsync(string barkod)
+        public async Task<Urun?> BarkodIleGetirAsync(string barkod)
             => await _db!.Table<Urun>().Where(u => u.Barkod == barkod).FirstOrDefaultAsync();
 
         public async Task UrunEkleAsync(Urun urun)
@@ -50,5 +62,39 @@ namespace Saller_System.Services
             => await _db!.Table<Satis>()
                         .Where(s => s.Tarih.Date == tarih.Date)
                         .ToListAsync();
+        // ── KULLANICI İŞLEMLERİ ─────────────────────────
+        public async Task<Kullanici?> GirisKontrolAsync(string kullaniciAdi, string sifre)
+            => await _db!.Table<Kullanici>()
+                         .Where(k => k.KullaniciAdi == kullaniciAdi && k.Sifre == sifre)
+                         .FirstOrDefaultAsync();
+
+        public async Task<List<Kullanici>> TumKullanicilariGetirAsync()
+            => await _db!.Table<Kullanici>().ToListAsync();
+
+        public async Task KullaniciEkleAsync(Kullanici kullanici)
+            => await _db!.InsertAsync(kullanici);
+
+        public async Task KullaniciSilAsync(Kullanici kullanici)
+            => await _db!.DeleteAsync(kullanici);
+        // ── İSTATİSTİK İŞLEMLERİ ────────────────────────
+        public async Task<decimal> GunlukCiroAsync(DateTime tarih)
+        {
+            var satislar = await GunlukSatislerAsync(tarih);
+            return satislar.Sum(s => s.Fiyat * s.Adet);
+        }
+
+        public async Task<decimal> AylikCiroAsync(int yil, int ay)
+        {
+            var satislar = await _db!.Table<Satis>()
+                .Where(s => s.Tarih.Year == yil && s.Tarih.Month == ay)
+                .ToListAsync();
+            return satislar.Sum(s => s.Fiyat * s.Adet);
+        }
+
+        public async Task<int> GunlukSatisSayisiAsync(DateTime tarih)
+        {
+            var satislar = await GunlukSatislerAsync(tarih);
+            return satislar.Sum(s => s.Adet);
+        }
     }
 }
