@@ -1,4 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
+using Saller_System.Services;
+using ZXing.Net.Maui.Controls;
 
 namespace Saller_System
 {
@@ -7,16 +9,21 @@ namespace Saller_System
         public static MauiApp CreateMauiApp()
         {
             var builder = MauiApp.CreateBuilder();
+
             builder
                 .UseMauiApp<App>()
+                .UseBarcodeReader()  // barkod okuyucu
                 .ConfigureFonts(fonts =>
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                     fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
                 });
 
+            // DatabaseService'i uygulamaya tanıt
+            builder.Services.AddSingleton<DatabaseService>();
+
 #if DEBUG
-    		builder.Logging.AddDebug();
+            builder.Logging.AddDebug();
 #endif
 
             return builder.Build();
