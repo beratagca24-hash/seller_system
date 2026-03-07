@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Saller_System.Services;
+using Saller_System.Views;
 using ZXing.Net.Maui.Controls;
 
 namespace Saller_System
@@ -21,6 +22,7 @@ namespace Saller_System
 
             // DatabaseService'i uygulamaya tanıt
             builder.Services.AddSingleton<DatabaseService>();
+            builder.Services.AddTransient<UrunEkle>();
 
 #if DEBUG
             builder.Logging.AddDebug();

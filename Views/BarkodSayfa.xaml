@@ -19,21 +19,18 @@
                 CornerRadius="8" HeightRequest="50"
                 Clicked="UrunGetirClicked"/>
 
-        <Frame x:Name="UrunBilgiFrame" IsVisible="False"
-               BorderColor="#2E75B6" CornerRadius="8" Padding="15">
-            <VerticalStackLayout Spacing="8">
-                <Label x:Name="UrunAdLabel" FontSize="18" FontAttributes="Bold"/>
-                <Label x:Name="UrunFiyatLabel" FontSize="16" TextColor="#166534"/>
-                <Label x:Name="UrunKategoriLabel" FontSize="14" TextColor="Gray"/>
-
-                <Entry x:Name="AdetEntry" Placeholder="Adet" Keyboard="Numeric" Text="1"/>
-
-                <Button Text="✅ Satışa Ekle"
-                        BackgroundColor="#166534" TextColor="White"
-                        CornerRadius="8" HeightRequest="45"
-                        Clicked="SatisaEkleClicked"/>
-            </VerticalStackLayout>
-        </Frame>
+        <VerticalStackLayout x:Name="UrunBilgiFrame" IsVisible="False"
+                             Spacing="8" Padding="15"
+                             BackgroundColor="#EEF4FF">
+            <Label x:Name="UrunAdLabel" FontSize="18" FontAttributes="Bold"/>
+            <Label x:Name="UrunFiyatLabel" FontSize="16" TextColor="#166534"/>
+            <Label x:Name="UrunKategoriLabel" FontSize="14" TextColor="Gray"/>
+            <Entry x:Name="AdetEntry" Placeholder="Adet" Keyboard="Numeric" Text="1"/>
+            <Button Text="✅ Satışa Ekle"
+                    BackgroundColor="#166534" TextColor="White"
+                    CornerRadius="8" HeightRequest="45"
+                    Clicked="SatisaEkleClicked"/>
+        </VerticalStackLayout>
 
         <Label x:Name="MesajLabel" TextColor="Green"
                HorizontalOptions="Center" IsVisible="False"/>

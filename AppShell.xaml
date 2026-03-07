@@ -12,4 +12,11 @@
                   ContentTemplate="{DataTemplate views:AnaSayfa}"/>
     <ShellContent Route="BarkodSayfa"
               ContentTemplate="{DataTemplate views:BarkodSayfa}"/>
+    <ShellContent Route="UrunListesi"
+              ContentTemplate="{DataTemplate views:UrunListesi}"/>
+
+    <ShellContent Route="Raporlar"
+              ContentTemplate="{DataTemplate views:Raporlar}"/>
+    <ShellContent Route="UrunEkle"
+              ContentTemplate="{DataTemplate views:UrunEkle}"/>
 </Shell>
