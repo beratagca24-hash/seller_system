@@ -1,10 +1,16 @@
+using Saller_System.Models;
+using Saller_System.Services;
+
 namespace Saller_System.Views
 {
     public partial class LoginPage : ContentPage
     {
-        public LoginPage()
+        private readonly DatabaseService _db;
+
+        public LoginPage(DatabaseService db)
         {
             InitializeComponent();
+            _db = db;
         }
 
         private async void GirisYapClicked(object sender, EventArgs e)
@@ -12,9 +18,12 @@ namespace Saller_System.Views
             string kullanici = KullaniciAdiEntry.Text?.Trim() ?? "";
             string sifre = SifreEntry.Text?.Trim() ?? "";
 
-            // Þimdilik sabit kullanýcýlar, ilerleyen adýmda veritabanýna taþýrýz
-            if (kullanici == "admin" && sifre == "1234")
+            await _db.InitAsync();
+            var bulunanKullanici = await _db.GirisKontrolAsync(kullanici, sifre);
+
+            if (bulunanKullanici != null)
             {
+                OturumServisi.AktifKullanici = bulunanKullanici;
                 await Shell.Current.GoToAsync("//AnaSayfa");
             }
             else

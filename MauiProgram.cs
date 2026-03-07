@@ -23,7 +23,7 @@ namespace Saller_System
             // DatabaseService'i uygulamaya tanıt
             builder.Services.AddSingleton<DatabaseService>();
             builder.Services.AddTransient<UrunEkle>();
-
+            builder.Services.AddSingleton<ExcelServisi>();
 #if DEBUG
             builder.Logging.AddDebug();
 #endif
