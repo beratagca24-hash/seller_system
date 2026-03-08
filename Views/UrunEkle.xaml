@@ -10,7 +10,7 @@
             <Label Text="📦 Yeni Ürün Ekle"
                    FontSize="22" FontAttributes="Bold"
                    TextColor="#1A3A5C"/>
-
+             
             <Label Text="Ürün Adı" TextColor="Gray"/>
             <Entry x:Name="AdEntry" Placeholder="Ürün adını girin"/>
 
@@ -31,7 +31,15 @@
                 <Label Text="Kg Fiyatı (₺/kg)" TextColor="{StaticResource TextSecondary}"/>
                 <Entry x:Name="KgFiyatiEntry" Placeholder="0.00" Keyboard="Numeric"/>
             </VerticalStackLayout>
+            <VerticalStackLayout x:Name="AlisFiyatPanel" Spacing="8">
+                <Label Text="Alış Fiyatı (₺)" TextColor="{StaticResource TextSecondary}"/>
+                <Entry x:Name="AlisFiyatiEntry" Placeholder="0.00" Keyboard="Numeric"/>
+            </VerticalStackLayout>
 
+            <VerticalStackLayout x:Name="KgAlisFiyatPanel" IsVisible="False" Spacing="8">
+                <Label Text="Alış Kg Fiyatı (₺/kg)" TextColor="{StaticResource TextSecondary}"/>
+                <Entry x:Name="KgAlisFiyatiEntry" Placeholder="0.00" Keyboard="Numeric"/>
+            </VerticalStackLayout>
             <Button Text="💾 Kaydet"
                     BackgroundColor="#166534" TextColor="White"
                     CornerRadius="8" HeightRequest="50"
@@ -39,7 +47,7 @@
 
             <Label x:Name="MesajLabel" TextColor="Green"
                    HorizontalOptions="Center" IsVisible="False"/>
-
+              
             <Button Text="⬅ Geri"
                     BackgroundColor="Gray" TextColor="White"
                     CornerRadius="8" HeightRequest="45"
