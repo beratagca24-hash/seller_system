@@ -1,32 +1,123 @@
 ﻿using Saller_System.Models;
 using Saller_System.Services;
+using ZXing.Net.Maui;
 
 namespace Saller_System.Views
 {
     public partial class BarkodSayfa : ContentPage
     {
         private readonly DatabaseService _db;
+        private readonly SepetServisi _sepet;
         private Urun? _bulunanUrun;
-
-        public BarkodSayfa(DatabaseService db)
+        private decimal _hesaplananFiyat = 0;
+        private decimal _kg = 0;
+        public BarkodSayfa(DatabaseService db, SepetServisi sepet)
         {
             InitializeComponent();
             _db = db;
+            _sepet = sepet;
         }
 
         private async void UrunGetirClicked(object sender, EventArgs e)
         {
             string barkod = BarkodEntry.Text?.Trim() ?? "";
             if (string.IsNullOrEmpty(barkod)) return;
+            await UrunGetirAsync(barkod);
+        }
 
-            await _db.InitAsync();
-            _bulunanUrun = await _db.BarkodIleGetirAsync(barkod);
+        private async void SatisaEkleClicked(object sender, EventArgs e)
+        {
+            if (_bulunanUrun == null) return;
 
-            if (_bulunanUrun != null)
+            decimal fiyat;
+            int adet = 1;
+
+            if (_bulunanUrun.GramajliMi && _hesaplananFiyat > 0)
             {
-                UrunAdLabel.Text = _bulunanUrun.Ad;
-                UrunFiyatLabel.Text = $"Fiyat: {_bulunanUrun.Fiyat:C2}";
-                UrunKategoriLabel.Text = $"Kategori: {_bulunanUrun.Kategori}";
+                fiyat = _hesaplananFiyat;
+            }
+            else
+            {
+                if (!int.TryParse(AdetEntry.Text, out adet) || adet <= 0)
+                {
+                    await DisplayAlert("Hata", "Adet 0'dan büyük olmalıdır!", "Tamam");
+                    return;
+                }
+                fiyat = _bulunanUrun.Fiyat;
+            }
+
+            _sepet.Ekle(_bulunanUrun, adet, fiyat);
+
+            MesajLabel.Text = $"✅ {_bulunanUrun.Ad} sepete eklendi! (Sepet: {_sepet.ToplamAdet} ürün)";
+            MesajLabel.IsVisible = true;
+            UrunBilgiFrame.IsVisible = false;
+            BarkodEntry.Text = "";
+            _bulunanUrun = null;
+            _hesaplananFiyat = 0;
+            _kg = 0;
+        }
+
+        private void KameraToggleClicked(object sender, EventArgs e)
+        {
+            BarkodOkuyucu.IsDetecting = !BarkodOkuyucu.IsDetecting;
+        }
+
+        private async void BarkodOkundu(object sender, BarcodeDetectionEventArgs e)
+        {
+            BarkodOkuyucu.IsDetecting = false;
+            var ilkSonuc = e.Results.FirstOrDefault();
+            if (ilkSonuc == null) return;
+
+            await MainThread.InvokeOnMainThreadAsync(async () =>
+            {
+                BarkodEntry.Text = ilkSonuc.Value;
+                await UrunGetirAsync(ilkSonuc.Value);
+            });
+        }
+
+        private async Task UrunGetirAsync(string barkod)
+        {
+            await _db.InitAsync();
+
+            var (urunKodu, kg, tartiMi) = TartiServisi.BarkodCoz(barkod);
+
+            Urun? bulunanUrun = null;
+
+            if (tartiMi)
+            {
+                // Tartı ürünü — ürün koduna göre ara
+                bulunanUrun = await _db.BarkodIleGetirAsync(urunKodu);
+
+                if (bulunanUrun != null && bulunanUrun.GramajliMi)
+                {
+                    decimal hesaplananFiyat = TartiServisi.FiyatHesapla(bulunanUrun.KgFiyati, kg);
+                    _bulunanUrun = bulunanUrun;
+                    _hesaplananFiyat = hesaplananFiyat;
+                    _kg = kg;
+
+                    UrunAdLabel.Text = $"{bulunanUrun.Ad} ({kg:N3} kg)";
+                    UrunFiyatLabel.Text = $"Fiyat: ₺{hesaplananFiyat:N2} ({kg:N3} kg × ₺{bulunanUrun.KgFiyati:N2}/kg)";
+                    UrunKategoriLabel.Text = $"Kategori: {bulunanUrun.Kategori}";
+                    AdetEntry.Text = "1";
+                    AdetEntry.IsEnabled = false; // Gramajlı üründe adet değiştirilmez
+                    UrunBilgiFrame.IsVisible = true;
+                    MesajLabel.IsVisible = false;
+                    return;
+                }
+            }
+
+            // Normal barkod
+            bulunanUrun = await _db.BarkodIleGetirAsync(barkod);
+            _hesaplananFiyat = 0;
+            _kg = 0;
+
+            if (bulunanUrun != null)
+            {
+                _bulunanUrun = bulunanUrun;
+                UrunAdLabel.Text = bulunanUrun.Ad;
+                UrunFiyatLabel.Text = $"Fiyat: ₺{bulunanUrun.Fiyat:N2}";
+                UrunKategoriLabel.Text = $"Kategori: {bulunanUrun.Kategori}";
+                AdetEntry.IsEnabled = true;
                 UrunBilgiFrame.IsVisible = true;
                 MesajLabel.IsVisible = false;
             }
@@ -36,34 +127,10 @@ namespace Saller_System.Views
             }
         }
 
-        private async void SatisaEkleClicked(object sender, EventArgs e)
-        {
-            if (_bulunanUrun == null) return;
-
-            int adet = int.TryParse(AdetEntry.Text, out int a) ? a : 1;
-
-            var satis = new Satis
-            {
-                UrunId = _bulunanUrun.Id,
-                UrunAd = _bulunanUrun.Ad,
-                Fiyat = _bulunanUrun.Fiyat,
-                Adet = adet,
-                Tarih = DateTime.Now,
-                KasiyerAd = "Kasiyer"
-            };
-
-            await _db.SatisKaydetAsync(satis);
-
-            MesajLabel.Text = $"✅ {_bulunanUrun.Ad} satışa eklendi!";
-            MesajLabel.IsVisible = true;
-            UrunBilgiFrame.IsVisible = false;
-            BarkodEntry.Text = "";
-            _bulunanUrun = null;
-        }
-
         private async void GeriClicked(object sender, EventArgs e)
-        {
-            await Shell.Current.GoToAsync("//AnaSayfa");
-        }
+            => await Shell.Current.GoToAsync("//AnaSayfa");
+
+        private async void SepeteGitClicked(object sender, EventArgs e)
+            => await Shell.Current.GoToAsync("//SepetSayfa");
     }
 }
