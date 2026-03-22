@@ -82,7 +82,7 @@ namespace Saller_System.Views
 
         private async void CikisClicked(object sender, EventArgs e)
         {
-            OturumServisi.AktifKullanici = null;
+            OturumServisi.Cikis();
             await Shell.Current.GoToAsync("//LoginPage");
         }
     }

@@ -33,7 +33,7 @@ namespace Saller_System.Views
 
                 if (bulunanKullanici != null)
                 {
-                    OturumServisi.AktifKullanici = bulunanKullanici;
+                    OturumServisi.Giris(bulunanKullanici);
                     MainThread.BeginInvokeOnMainThread(async () =>
                     {
                         await Shell.Current.GoToAsync("//AnaSayfa");
