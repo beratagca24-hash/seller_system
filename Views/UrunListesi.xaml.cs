@@ -66,23 +66,41 @@ namespace Saller_System.Views
 
         private async void KaydetClicked(object sender, EventArgs e)
         {
-            if (string.IsNullOrWhiteSpace(AdEntry.Text)) return;
+            if (string.IsNullOrWhiteSpace(AdEntry.Text))
+            {
+                await DisplayAlert("Hata", "Lütfen en azından bir ürün adı girin.", "Tamam");
+                return;
+            }
+
             OturumServisi.AktiviteYenile();
+
+            // Fiyatları sayıya güvenli bir şekilde çevir
+            decimal.TryParse(FiyatEntry.Text, out decimal girilenSatis);
+            decimal.TryParse(AlisFiyatiEntry.Text, out decimal girilenAlis);
+            bool isGramajli = GramajliSwitch.IsToggled;
 
             var urun = new Urun
             {
                 Ad = AdEntry.Text,
                 Barkod = BarkodEntry.Text,
                 Kategori = KategoriEntry.Text,
-                Fiyat = decimal.TryParse(FiyatEntry.Text, out var f) ? f : 0,
-                AlisFiyati = decimal.TryParse(AlisFiyatiEntry.Text, out var a) ? a : 0,
-                GramajliMi = GramajliSwitch.IsToggled
+                GramajliMi = isGramajli,
+
+                // YENİ MANTIK: Eğer gramajlıysa değerleri Kg kısmına, değilse Normal kısma at.
+                Fiyat = isGramajli ? 0 : girilenSatis,
+                AlisFiyati = isGramajli ? 0 : girilenAlis,
+                KgFiyati = isGramajli ? girilenSatis : 0,
+                KgAlisFiyati = isGramajli ? girilenAlis : 0,
+
+                StokMiktari = 0 // Yeni ürün stoğu her zaman 0 başlar
             };
 
             await _db.UrunEkleAsync(urun);
-            AdEntry.Text = BarkodEntry.Text = KategoriEntry.Text =
-                FiyatEntry.Text = AlisFiyatiEntry.Text = "";
+
+            // Formu temizle
+            AdEntry.Text = BarkodEntry.Text = KategoriEntry.Text = FiyatEntry.Text = AlisFiyatiEntry.Text = "";
             GramajliSwitch.IsToggled = false;
+
             await ListeYukle();
         }
 
