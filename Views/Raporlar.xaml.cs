@@ -48,19 +48,31 @@ namespace Saller_System.Views
             var bugun = DateTime.Today;
 
             var gunlukKar = await _db.GunlukKarAsync(bugun);
-            var aylikKar = await _db.AylikKarAsync(bugun.Year, bugun.Month);
-            var gunlukCiro = await _db.GunlukCiroAsync(bugun);
+            // 1. DÜZELTME: Sadece gerçek ciro (Tahsilatlar Hariç) hesaplanır
+            var gunlukCiro = await _db.GunlukGercekCiroAsync(bugun);
+
             var gunlukSayi = await _db.GunlukSatisSayisiAsync(bugun);
             var aylikCiro = await _db.AylikCiroAsync(bugun.Year, bugun.Month);
             var performans = await _db.PersonelPerformansRaporuGetirAsync(bugun);
 
+            // 2. YENİ EKLENEN: KASA MATEMATİĞİ (Çift sayım önleyici)
+            decimal tahsilat = await _db.GunlukTahsilatToplamiAsync(bugun);
+            var veresiyeIslemleri = await _db.GunlukVeresiyeDetaylariAsync(bugun);
+            decimal veresiyeCikan = veresiyeIslemleri.Where(v => v.Tutar > 0).Sum(v => v.Tutar);
+            decimal netKasa = gunlukCiro - veresiyeCikan + tahsilat;
+
             PersonelPerformansListesi.ItemsSource = performans;
             GunlukKarLabel.Text = $"₺{gunlukKar:N2}";
-            AylikKarLabel.Text = $"₺{aylikKar:N2}";
-            GunlukCiroLabel.Text = $"₺{gunlukCiro:N2}";
+            // AylikKarLabel XAML tasarımında olmadığı için bu satır SİLİNDİ.
             GunlukSayiLabel.Text = $"{gunlukSayi} Adet";
             AylikCiroLabel.Text = $"₺{aylikCiro:N2}";
             AyLabel.Text = bugun.ToString("MMMM yyyy").ToUpper();
+
+            // Kasa Değerleri
+            GunlukCiroLabel.Text = $"₺{gunlukCiro:N2}";
+            VeresiyeCikanLabel.Text = $"- ₺{veresiyeCikan:N2}";
+            TahsilatGirenLabel.Text = $"+ ₺{tahsilat:N2}";
+            NetKasaLabel.Text = $"₺{netKasa:N2}";
         }
 
         private async void SatisGecmisiClicked(object sender, EventArgs e)
@@ -75,7 +87,9 @@ namespace Saller_System.Views
             var satislar = await _db.GunlukSatislerAsync(DateTime.Today);
             if (satislar.Count == 0) return;
 
-            string dosyaYolu = _excel.RaporOlustur(satislar, "Gunluk_Rapor");
+            // Excel Servisine "tarih" bağlantısını gönderiyoruz ki veresiye datalarını da çekebilsin
+            string dosyaYolu = await _excel.RaporOlustur(satislar, "Gunluk_Rapor", DateTime.Today);
+
             await Share.Default.RequestAsync(new ShareFileRequest
             {
                 Title = "Rapor",

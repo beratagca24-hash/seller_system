@@ -48,7 +48,6 @@ namespace Saller_System.Views
             SonIslemlerBolumu.IsVisible = isYonetici;
             VeresiyeBtn.IsVisible = true;
 
-            // Stok Butonunu Sadece Yönetici ve Patron görsün
             if (StokBtn != null)
             {
                 StokBtn.IsVisible = isYonetici;
@@ -70,8 +69,10 @@ namespace Saller_System.Views
             await _db.InitAsync();
             var bugun = DateTime.Today;
 
+            // HATA ÇÖZÜMÜ: GunlukCiroAsync yerine GunlukGercekCiroAsync (Et Satışı) çağrıldı
             var gunlukSayi = await _db.GunlukSatisSayisiAsync(bugun);
-            var gunlukCiro = await _db.GunlukCiroAsync(bugun);
+            var gunlukCiro = await _db.GunlukGercekCiroAsync(bugun);
+
             GunlukSatisLabel.Text = gunlukSayi.ToString("N1");
             GunlukCiroLabel.Text = $"₺{gunlukCiro:N0}";
 
@@ -90,14 +91,8 @@ namespace Saller_System.Views
         private async void VeresiyeDefteriClicked(object sender, EventArgs e)
         {
             OturumServisi.AktiviteYenile();
-            try
-            {
-                await Shell.Current.GoToAsync("VeresiyeDefteri");
-            }
-            catch (Exception ex)
-            {
-                await DisplayAlert("Navigasyon Hatası", $"Sayfa açılamadı: {ex.Message}", "Tamam");
-            }
+            try { await Shell.Current.GoToAsync("VeresiyeDefteri"); }
+            catch (Exception ex) { await DisplayAlert("Hata", ex.Message, "Tamam"); }
         }
 
         private async void BarkodOkutClicked(object sender, EventArgs e)
@@ -109,14 +104,8 @@ namespace Saller_System.Views
         private async void ToptanSatisClicked(object sender, EventArgs e)
         {
             OturumServisi.AktiviteYenile();
-            try
-            {
-                await Shell.Current.GoToAsync("ToptanSatis");
-            }
-            catch (Exception ex)
-            {
-                await DisplayAlert("Navigasyon Hatası", $"Sayfa açılamadı: {ex.Message}", "Tamam");
-            }
+            try { await Shell.Current.GoToAsync("ToptanSatis"); }
+            catch (Exception ex) { await DisplayAlert("Hata", ex.Message, "Tamam"); }
         }
 
         private async void UrunListesiClicked(object sender, EventArgs e)
@@ -137,18 +126,11 @@ namespace Saller_System.Views
             await Shell.Current.GoToAsync("//KullaniciYonetimi");
         }
 
-        // YENİ EKLENEN STOK BUTONU OLAYI
         private async void StokClicked(object sender, EventArgs e)
         {
             OturumServisi.AktiviteYenile();
-            try
-            {
-                await Shell.Current.GoToAsync("StokYonetimi");
-            }
-            catch (Exception ex)
-            {
-                await DisplayAlert("Stok Sayfası", "Stok sayfası henüz oluşturulmadı, yakında eklenecek!", "Tamam");
-            }
+            try { await Shell.Current.GoToAsync("StokYonetimi"); }
+            catch (Exception ex) { await DisplayAlert("Hata", ex.Message, "Tamam"); }
         }
 
         private async void AyarlarClicked(object sender, EventArgs e)

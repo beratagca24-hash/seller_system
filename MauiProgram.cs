@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Logging;
+using Plugin.Maui.Audio; // SES İÇİN
 using Saller_System.Services;
 using Saller_System.Views;
+using SkiaSharp.Views.Maui.Controls; // GRAFİK İÇİN
 using ZXing.Net.Maui.Controls;
 
 namespace Saller_System
@@ -12,20 +14,25 @@ namespace Saller_System
             var builder = MauiApp.CreateBuilder();
             builder.UseMauiApp<App>()
                 .UseBarcodeReader()
+                .UseSkiaSharp() // Grafik motorunu aktif ettik
                 .ConfigureFonts(fonts =>
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                     fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
                 });
 
-            // Singleton servisler
+            // --- SERVİSLER ---
             builder.Services.AddSingleton<DatabaseService>();
             builder.Services.AddSingleton<AyarlarServisi>();
             builder.Services.AddSingleton<SepetServisi>();
             builder.Services.AddSingleton<ExcelServisi>();
+
+            // SES MOTORU KAYDI: Sisteme ses çalma yeteneği kazandırır
+            builder.Services.AddSingleton(AudioManager.Current);
+
             builder.Services.AddSingleton<App>();
 
-            // Sayfalar
+            // --- SAYFALAR ---
             builder.Services.AddTransient<SplashSayfa>();
             builder.Services.AddTransient<KurulumSihirbazi>();
             builder.Services.AddTransient<LoginPage>();
@@ -40,12 +47,17 @@ namespace Saller_System
             builder.Services.AddTransient<AyarlarSayfa>();
             builder.Services.AddTransient<FiyatGecmisiSayfa>();
             builder.Services.AddTransient<SatisGecmisiSayfa>();
+            builder.Services.AddTransient<VeresiyeDefteri>();
+            builder.Services.AddTransient<MusteriEkstresi>();
+            builder.Services.AddTransient<ToptanSatis>();
+            builder.Services.AddTransient<StokYonetimi>();
+            builder.Services.AddTransient<GiderlerSayfa>();
 
 #if DEBUG
             builder.Logging.AddDebug();
 #endif
 
-            // Android entry görünümü
+            // Android alt çizgi ve karanlık mod ayarları
             Microsoft.Maui.Handlers.EntryHandler.Mapper.AppendToMapping("NoUnderline", (handler, view) =>
             {
 #if ANDROID
@@ -53,10 +65,10 @@ namespace Saller_System
                     Android.Content.Res.ColorStateList.ValueOf(Android.Graphics.Color.Transparent);
                 handler.PlatformView.SetBackgroundColor(Android.Graphics.Color.Transparent);
 
-                bool darkMode = (handler.PlatformView.Context?.Resources?.Configuration?.UiMode
+                bool isDarkMode = (handler.PlatformView.Context?.Resources?.Configuration?.UiMode
                     & Android.Content.Res.UiMode.NightMask) == Android.Content.Res.UiMode.NightYes;
 
-                if (darkMode)
+                if (isDarkMode)
                 {
                     handler.PlatformView.SetTextColor(Android.Graphics.Color.White);
                     handler.PlatformView.SetHintTextColor(Android.Graphics.Color.ParseColor("#9CA3AF"));

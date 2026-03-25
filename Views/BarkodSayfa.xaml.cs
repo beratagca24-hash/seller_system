@@ -2,6 +2,7 @@ using Saller_System.Models;
 using Saller_System.Services;
 using ZXing.Net.Maui;
 using Microsoft.Maui.ApplicationModel;
+using Plugin.Maui.Audio; // SES İÇİN EKLENDİ
 
 namespace Saller_System.Views
 {
@@ -10,14 +11,17 @@ namespace Saller_System.Views
         private readonly DatabaseService _db;
         private readonly SepetServisi _sepet;
         private readonly AyarlarServisi _ayarlar;
+        private readonly IAudioManager _audioManager; // SES MOTORU EKLENDİ
         private Urun? _bulunanUrun;
 
-        public BarkodSayfa(DatabaseService db, SepetServisi sepet, AyarlarServisi ayarlar)
+        public BarkodSayfa(DatabaseService db, SepetServisi sepet, AyarlarServisi ayarlar, IAudioManager audioManager)
         {
             InitializeComponent();
             _db = db;
             _sepet = sepet;
             _ayarlar = ayarlar;
+            _audioManager = audioManager; // SES MOTORU ENJEKTE EDİLDİ
+
             BarkodOkuyucu.Options = new BarcodeReaderOptions
             {
                 Formats = BarcodeFormat.Ean13 | BarcodeFormat.Ean8 | BarcodeFormat.Code128 | BarcodeFormat.QrCode,
@@ -26,10 +30,25 @@ namespace Saller_System.Views
             };
         }
 
+        // SES ÇALMA METODU
+        private async Task BipCal()
+        {
+            try
+            {
+                // Resources/Raw/bip.wav dosyasını çalar
+                var player = _audioManager.CreatePlayer(await FileSystem.OpenAppPackageFileAsync("bip.wav"));
+                player.Play();
+            }
+            catch (Exception ex)
+            {
+                // Ses çalınamazsa uygulama hata vermez, sessizce devam eder
+                System.Diagnostics.Debug.WriteLine($"Ses Çalma Hatası: {ex.Message}");
+            }
+        }
+
         protected override async void OnAppearing()
         {
             base.OnAppearing();
-
             if (await ZamanAsimKontrolAsync()) return;
 
             OturumServisi.AktiviteYenile();
@@ -90,10 +109,8 @@ namespace Saller_System.Views
             if (okunanBarkod.Length == 13 && okunanBarkod.StartsWith(prefix))
             {
                 teraziUrunuMu = true;
-
                 aranacakBarkod = okunanBarkod.Substring(2, 5);
                 string miktarStr = okunanBarkod.Substring(7, 5);
-
                 okunanMiktar = decimal.Parse(miktarStr) / 1000m;
             }
 
@@ -108,12 +125,14 @@ namespace Saller_System.Views
             {
                 _bulunanUrun = urun;
 
+                // Ürün bulunduğunda "BİP" sesi çal
+                await BipCal();
+
                 if (urun.GramajliMi || teraziUrunuMu)
                 {
                     UrunAdLabel.Text = urun.Ad;
                     UrunFiyatLabel.Text = $"Birim Fiyat: ₺{urun.KgFiyati:N2} / Kg";
                     UrunKategoriLabel.Text = $"Kategori: {urun.Kategori}";
-
                     AdetEntry.Text = okunanMiktar.ToString("0.###");
 
                     UrunBilgiFrame.IsVisible = true;
@@ -137,7 +156,6 @@ namespace Saller_System.Views
             }
             else
             {
-                // Ürün bulunamadı (titreşim yok, sadece ekrana soruyor)
                 bool ekle = await DisplayAlert("Ürün Bulunamadı",
                     $"'{okunanBarkod}' sistemde yok. Hemen eklemek ister misiniz?", "Evet", "Hayır");
                 if (ekle)
@@ -152,20 +170,19 @@ namespace Saller_System.Views
             }
         }
 
-        private void SatisaEkleTapped(object sender, EventArgs e)
+        private async void SatisaEkleTapped(object sender, EventArgs e)
         {
             if (_bulunanUrun == null) return;
 
             OturumServisi.AktiviteYenile();
 
             decimal eklenecekFiyat = _bulunanUrun.GramajliMi ? _bulunanUrun.KgFiyati : _bulunanUrun.Fiyat;
-
-            // AdetEntry artık decimal (küsuratlı) değer alıyor (Örn: 0.525)
             decimal girilenMiktar = decimal.Parse(AdetEntry.Text);
 
             _sepet.Ekle(_bulunanUrun, girilenMiktar, eklenecekFiyat);
 
-            // Başarılı işlem titreşimi
+            // Onay butonuna basıldığında da bir "BİP" daha çalsın
+            await BipCal();
             HapticFeedback.Default.Perform(HapticFeedbackType.Click);
 
             MesajLabel.Text = $"✅ {_bulunanUrun.Ad} sepete eklendi!";
