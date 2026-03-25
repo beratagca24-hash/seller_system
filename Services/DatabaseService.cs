@@ -22,14 +22,22 @@ namespace Saller_System.Services
             string dbPath = Path.Combine(FileSystem.AppDataDirectory, "saller.db");
             _db = new SQLiteAsyncConnection(dbPath);
 
-            // Tabloları oluştur
+            // Tabloları oluştur (ESKİLER)
             await _db.CreateTableAsync<Urun>();
             await _db.CreateTableAsync<Satis>();
             await _db.CreateTableAsync<FiyatGecmisi>();
             await _db.CreateTableAsync<Kullanici>();
             await _db.CreateTableAsync<ArsivedSatis>();   // Arşiv tablosu
 
+            // YENİ EKLENEN TABLOLAR (Veresiye ve Toptan Satış)
+            await _db.CreateTableAsync<Musteri>();
+            await _db.CreateTableAsync<VeresiyeIslem>();
+            await _db.CreateTableAsync<ToptanSatis>();
+
             await VarsayilanKullanicilariOlusturAsync();
+
+            // Uygulama her açıldığında 1 yıldan eski önemsiz verileri temizle
+            await BirYillikEskiVerileriTemizleAsync();
         }
 
         // Varsayılan kullanıcıları oluştur (ilk kurulumda)
@@ -41,29 +49,29 @@ namespace Saller_System.Services
 
             if (admin != null) return;  // Zaten kurulu
 
-            // Parolalar PBKDF2 ile hash'lenerek kaydedilir
+            // DEĞİŞİKLİK: Şifreler artık düz metin olarak kaydediliyor
             await _db.InsertAsync(new Kullanici
             {
                 KullaniciAdi = "admin",
-                Sifre = GuvenlikServisi.Hashle("1234"),
+                Sifre = "1234",
                 Rol = "Patron"
             });
             await _db.InsertAsync(new Kullanici
             {
                 KullaniciAdi = "yonetici",
-                Sifre = GuvenlikServisi.Hashle("1234"),
+                Sifre = "1234",
                 Rol = "Müdür"
             });
             await _db.InsertAsync(new Kullanici
             {
                 KullaniciAdi = "kasiyer",
-                Sifre = GuvenlikServisi.Hashle("1234"),
+                Sifre = "1234",
                 Rol = "Kasiyer"
             });
         }
 
         // ================================================================
-        // GİRİŞ KONTROLÜ — PBKDF2 doğrulama + otomatik hash yükseltme
+        // GİRİŞ KONTROLÜ — Şifreleme (Hash) kaldırıldı, düz metin kontrolü
         // ================================================================
         public async Task<Kullanici?> GirisKontrolAsync(string ad, string sifre)
         {
@@ -73,15 +81,9 @@ namespace Saller_System.Services
 
             if (kullanici == null) return null;
 
-            if (!GuvenlikServisi.Dogrula(sifre, kullanici.Sifre))
+            // DEĞİŞİKLİK: Şifreler düz metin olarak karşılaştırılıyor
+            if (sifre != kullanici.Sifre)
                 return null;
-
-            // Eski düz-metin veya SHA-256 kayıt varsa otomatik yükselt
-            if (!GuvenlikServisi.HashGuncelMi(kullanici.Sifre))
-            {
-                kullanici.Sifre = GuvenlikServisi.Hashle(sifre);
-                await _db.UpdateAsync(kullanici);
-            }
 
             return kullanici;
         }
@@ -146,11 +148,6 @@ namespace Saller_System.Services
         // ================================================================
         // SATIŞ İŞLEMLERİ — TRANSACTION
         // ================================================================
-
-        /// <summary>
-        /// Sepetteki tüm kalemleri tek bir transaction içinde kaydeder.
-        /// Herhangi bir kayıt başarısız olursa tümü geri alınır.
-        /// </summary>
         public async Task SatisleriTopluKaydetAsync(IEnumerable<Satis> satisler)
         {
             await _db!.RunInTransactionAsync(db =>
@@ -160,11 +157,9 @@ namespace Saller_System.Services
             });
         }
 
-        // Tekil satış kaydı (geriye uyumluluk için)
         public async Task SatisKaydetAsync(Satis satis) =>
             await _db!.InsertAsync(satis);
 
-        // Tüm satışlar (sayfalı)
         public async Task<List<Satis>> TumSatisleriGetirAsync(int sayfa = 0, int boyut = SayfaBoyutu) =>
             await _db!.Table<Satis>()
                 .OrderByDescending(s => s.Tarih)
@@ -186,7 +181,7 @@ namespace Saller_System.Services
 
         public async Task<decimal> GunlukCiroAsync(DateTime tarih) => (await GunlukSatislerAsync(tarih)).Sum(s => s.Fiyat);
         public async Task<decimal> GunlukKarAsync(DateTime tarih) => (await GunlukSatislerAsync(tarih)).Sum(s => s.Kar);
-        public async Task<int> GunlukSatisSayisiAsync(DateTime tarih) => (await GunlukSatislerAsync(tarih)).Sum(s => s.Adet);
+        public async Task<decimal> GunlukSatisSayisiAsync(DateTime tarih) => (await GunlukSatislerAsync(tarih)).Sum(s => s.Adet);
 
         public async Task<List<Satis>> AylikSatislerAsync(int yil, int ay)
         {
@@ -203,13 +198,8 @@ namespace Saller_System.Services
             (await AylikSatislerAsync(yil, ay)).Sum(s => s.Kar);
 
         // ================================================================
-        // ARŞİVLEME — 30 günden eski satışları silmek yerine arşivle
+        // ARŞİVLEME VE 1 YILLIK OTOMATİK TEMİZLİK
         // ================================================================
-
-        /// <summary>
-        /// 30 günden eski satışları siler değil, ArsivedSatis tablosuna taşır.
-        /// Böylece mali kayıtlar korunur, ana tablo performanslı kalır.
-        /// </summary>
         public async Task EskiSatisleriArsivleAsync()
         {
             var sinir = DateTime.Now.AddDays(-30);
@@ -227,6 +217,26 @@ namespace Saller_System.Services
                     db.Delete(satis);
                 }
             });
+        }
+
+        // YENİ EKLENEN: 1 Yıldan eski ciro ve fiş verilerini siler (Müşteri ve Ürünler KALIR)
+        public async Task BirYillikEskiVerileriTemizleAsync()
+        {
+            var birYilOnce = DateTime.Now.AddYears(-1);
+
+            // ArsivedSatis tablosundaki 1 yıldan eski verileri sil
+            var silinecekSatislar = await _db!.Table<ArsivedSatis>()
+                .Where(s => s.Tarih < birYilOnce)
+                .ToListAsync();
+
+            if (silinecekSatislar.Any())
+            {
+                await _db.RunInTransactionAsync(db =>
+                {
+                    foreach (var satis in silinecekSatislar)
+                        db.Delete(satis);
+                });
+            }
         }
 
         public async Task<List<ArsivedSatis>> ArsivedSatisleriGetirAsync(int sayfa = 0, int boyut = SayfaBoyutu) =>
@@ -255,16 +265,14 @@ namespace Saller_System.Services
         }
 
         // ================================================================
-        // KULLANICI İŞLEMLERİ
+        // KULLANICI İŞLEMLERİ — Şifreleme (Hash) kaldırıldı, düz metin kaydediliyor
         // ================================================================
         public async Task<List<Kullanici>> TumKullanicilariGetirAsync() =>
             await _db!.Table<Kullanici>().ToListAsync();
 
         public async Task KullaniciEkleAsync(Kullanici k)
         {
-            // Ekleme sırasında parola her zaman hash'lenir
-            if (!GuvenlikServisi.HashGuncelMi(k.Sifre))
-                k.Sifre = GuvenlikServisi.Hashle(k.Sifre);
+            // DEĞİŞİKLİK: Şifreleme kaldırıldı
             await _db!.InsertAsync(k);
         }
 
@@ -276,9 +284,7 @@ namespace Saller_System.Services
 
         public async Task KullaniciGuncelleAsync(Kullanici k)
         {
-            // Güncelleme sırasında da parola hash kontrolü
-            if (!GuvenlikServisi.HashGuncelMi(k.Sifre))
-                k.Sifre = GuvenlikServisi.Hashle(k.Sifre);
+            // DEĞİŞİKLİK: Şifreleme kaldırıldı
             await _db!.UpdateAsync(k);
         }
 
@@ -290,12 +296,44 @@ namespace Saller_System.Services
 
         public async Task<List<FiyatGecmisi>> UrunFiyatGecmisiAsync(int id) =>
             await _db!.Table<FiyatGecmisi>().Where(f => f.UrunId == id).ToListAsync();
+
+
+        // ================================================================
+        // YENİ EKLENEN: MÜŞTERİ VE VERESİYE İŞLEMLERİ
+        // ================================================================
+        public async Task<List<Musteri>> TumMusterileriGetirAsync() =>
+            await _db!.Table<Musteri>().ToListAsync();
+
+        public async Task MusteriEkleAsync(Musteri m) =>
+            await _db!.InsertAsync(m);
+
+        public async Task VeresiyeIslemKaydetAsync(VeresiyeIslem islem)
+        {
+            await _db!.RunInTransactionAsync(db =>
+            {
+                db.Insert(islem);
+
+                // Müşterinin toplam borcunu güncelle
+                var musteri = db.Find<Musteri>(islem.MusteriId);
+                if (musteri != null)
+                {
+                    musteri.ToplamBorc += islem.Tutar;
+                    db.Update(musteri);
+                }
+            });
+        }
+
+        // ================================================================
+        // YENİ EKLENEN: TOPTAN SATIŞ İŞLEMLERİ
+        // ================================================================
+        public async Task ToptanSatisKaydetAsync(ToptanSatis toptanSatis) =>
+            await _db!.InsertAsync(toptanSatis);
+
     }
 
     // ====================================================================
     // YARDIMCI SINIFLAR
     // ====================================================================
-
     public class PersonelPerformans
     {
         public string PersonelAdi { get; set; } = "";

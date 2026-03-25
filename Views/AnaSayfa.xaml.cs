@@ -21,10 +21,10 @@ namespace Saller_System.Views
             base.OnAppearing();
             OturumServisi.AktiviteYenile();
 
-            // Mağaza adını dinamik yükle
+            // Mağaza adını dinamik yükle (Varsayılan ÖZ BİGA ET yapıldı)
             var magazaAdi = await _ayarlar.GetAsync("MagazaAdi", "");
             MagazaAdiLabel.Text = string.IsNullOrWhiteSpace(magazaAdi)
-                ? "KASAP PRO"
+                ? "ÖZ BİGA ET"
                 : magazaAdi.ToUpper();
 
             var kullanici = OturumServisi.AktifKullanici;
@@ -39,6 +39,7 @@ namespace Saller_System.Views
             OzetBilgiGrid.IsVisible = isYonetici;
             KullaniciYonetimiBtn.IsVisible = isPatron;
             SonIslemlerBolumu.IsVisible = isYonetici;
+            VeresiyeBtn.IsVisible = true; // Herkes görebilsin (Kasiyer de borç görebilir)
 
             UrunListesiAciklamasiniAyarla(isYonetici);
 
@@ -49,7 +50,6 @@ namespace Saller_System.Views
                 await VerileriDoldur();
         }
 
-        // Ana sayfada geri tuşu → uygulamadan çıkmasın
         protected override bool OnBackButtonPressed() => true;
 
         private async Task VerileriDoldur()
@@ -59,7 +59,7 @@ namespace Saller_System.Views
 
             var gunlukSayi = await _db.GunlukSatisSayisiAsync(bugun);
             var gunlukCiro = await _db.GunlukCiroAsync(bugun);
-            GunlukSatisLabel.Text = gunlukSayi.ToString();
+            GunlukSatisLabel.Text = gunlukSayi.ToString("N1"); // Decimal olduğu için N1 ile gösteriyoruz
             GunlukCiroLabel.Text = $"₺{gunlukCiro:N0}";
 
             var bugunkuSatislar = await _db.GunlukSatislerAsync(bugun);
@@ -72,6 +72,13 @@ namespace Saller_System.Views
             UrunListesiAciklamaLabel.Text = isYonetici
                 ? "Ürünleri görüntüle, ekle ve fiyatları yönet"
                 : "Kayıtlı ürün fiyatlarını görüntüle";
+        }
+
+        // YENİ EKLEDİĞİMİZ VERESİYE DEFTERİ BUTONU
+        private async void VeresiyeDefteriClicked(object sender, EventArgs e)
+        {
+            OturumServisi.AktiviteYenile();
+            await Shell.Current.GoToAsync("//VeresiyeDefteri");
         }
 
         private async void BarkodOkutClicked(object sender, EventArgs e)
