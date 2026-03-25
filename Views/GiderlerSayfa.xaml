@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Saller_System.Views.GiderlerSayfa"
+             Title="Gider Yönetimi"
+             BackgroundColor="{AppThemeBinding Light=#F4F7FB, Dark=#0B1220}">
+
+    <VerticalStackLayout Padding="20" Spacing="15">
+        <Label Text="Yeni Gider Ekle" FontSize="20" FontAttributes="Bold" TextColor="White"/>
+
+        <Border Stroke="#E2E8F0" StrokeShape="RoundRectangle 8" BackgroundColor="#1E293B">
+            <Entry x:Name="BaslikEntry" Placeholder="Gider Adı (Kira, Elektrik, Poşet...)" TextColor="White"/>
+        </Border>
+
+        <Border Stroke="#E2E8F0" StrokeShape="RoundRectangle 8" BackgroundColor="#1E293B">
+            <Entry x:Name="TutarEntry" Placeholder="Tutar (₺)" Keyboard="Numeric" TextColor="White"/>
+        </Border>
+
+        <Button Text="GİDERİ KAYDET" Clicked="GiderKaydetClicked" BackgroundColor="#E31E24" CornerRadius="10" FontAttributes="Bold" HeightRequest="50"/>
+
+        <Label Text="Bugünkü Giderler" FontSize="18" FontAttributes="Bold" TextColor="White" Margin="0,15,0,0"/>
+
+        <CollectionView x:Name="GiderListesi">
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <Border Stroke="#E2E8F0" StrokeShape="RoundRectangle 8" Padding="15" Margin="0,4" BackgroundColor="#1E293B">
+                        <Grid ColumnDefinitions="*, Auto">
+                            <Label Text="{Binding Baslik}" FontAttributes="Bold" TextColor="White"/>
+                            <Label Grid.Column="1" Text="{Binding Tutar, StringFormat='₺{0:N2}'}" TextColor="#E31E24" FontAttributes="Bold"/>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </VerticalStackLayout>
+</ContentPage>

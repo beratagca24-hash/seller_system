@@ -39,14 +39,18 @@
                 <DataTemplate x:DataType="models:Musteri">
                     <Border BackgroundColor="{AppThemeBinding Light=#FFFFFF, Dark=#1E293B}" Stroke="{AppThemeBinding Light=#E2E8F0, Dark=#334155}" StrokeThickness="1" Padding="16" Margin="0,0,0,10" StrokeShape="RoundRectangle 16">
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+
                             <VerticalStackLayout Grid.Column="0" VerticalOptions="Center" Spacing="4">
-                                <Label Text="{Binding AdSoyad}" TextColor="{AppThemeBinding Light=#0F172A, Dark=White}" FontAttributes="Bold" FontSize="16"/>
-                                <HorizontalStackLayout Spacing="5">
-                                    <Label Text="Toplam Borç:" TextColor="#94A3B8" FontSize="13"/>
-                                    <Label Text="{Binding ToplamBorc, StringFormat='₺{0:N2}'}" TextColor="#E31E24" FontSize="14" FontAttributes="Bold"/>
-                                </HorizontalStackLayout>
+                                <Label Text="{Binding AdSoyad}" TextColor="{AppThemeBinding Light=#0F172A, Dark=White}" FontAttributes="Bold" FontSize="17"/>
+                                <Label Text="{Binding DurumMetni}" TextColor="{Binding DurumRengi}" FontSize="14" FontAttributes="Bold"/>
                             </VerticalStackLayout>
-                            <Button Grid.Column="1" Text="Tahsilat Al" BackgroundColor="#D97706" TextColor="White" FontAttributes="Bold" CornerRadius="10" HeightRequest="40" Clicked="TahsilatAlClicked" CommandParameter="{Binding .}"/>
+
+                            <HorizontalStackLayout Grid.Column="1" Spacing="6" VerticalOptions="Center">
+                                <Button Text="📄 Ekstre" BackgroundColor="#3B82F6" TextColor="White" FontAttributes="Bold" CornerRadius="10" HeightRequest="40" Padding="8,0" Clicked="EkstreClicked" CommandParameter="{Binding .}"/>
+                                <Button Text="💵 Tahsilat" BackgroundColor="#D97706" TextColor="White" FontAttributes="Bold" CornerRadius="10" HeightRequest="40" Padding="8,0" Clicked="TahsilatAlClicked" CommandParameter="{Binding .}"/>
+                                <Button Text="🤝 Kapat" BackgroundColor="#64748B" TextColor="White" FontAttributes="Bold" CornerRadius="10" HeightRequest="40" Padding="8,0" Clicked="HesabiKapatClicked" CommandParameter="{Binding .}"/>
+                            </HorizontalStackLayout>
+
                         </Grid>
                     </Border>
                 </DataTemplate>
