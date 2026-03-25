@@ -2,7 +2,7 @@ using Saller_System.Models;
 using Saller_System.Services;
 using ZXing.Net.Maui;
 using Microsoft.Maui.ApplicationModel;
-using Plugin.Maui.Audio; // SES İÇİN EKLENDİ
+using Plugin.Maui.Audio;
 
 namespace Saller_System.Views
 {
@@ -11,7 +11,7 @@ namespace Saller_System.Views
         private readonly DatabaseService _db;
         private readonly SepetServisi _sepet;
         private readonly AyarlarServisi _ayarlar;
-        private readonly IAudioManager _audioManager; // SES MOTORU EKLENDİ
+        private readonly IAudioManager _audioManager;
         private Urun? _bulunanUrun;
 
         public BarkodSayfa(DatabaseService db, SepetServisi sepet, AyarlarServisi ayarlar, IAudioManager audioManager)
@@ -20,7 +20,7 @@ namespace Saller_System.Views
             _db = db;
             _sepet = sepet;
             _ayarlar = ayarlar;
-            _audioManager = audioManager; // SES MOTORU ENJEKTE EDİLDİ
+            _audioManager = audioManager;
 
             BarkodOkuyucu.Options = new BarcodeReaderOptions
             {
@@ -30,18 +30,15 @@ namespace Saller_System.Views
             };
         }
 
-        // SES ÇALMA METODU
         private async Task BipCal()
         {
             try
             {
-                // Resources/Raw/bip.wav dosyasını çalar
                 var player = _audioManager.CreatePlayer(await FileSystem.OpenAppPackageFileAsync("bip.wav"));
                 player.Play();
             }
             catch (Exception ex)
             {
-                // Ses çalınamazsa uygulama hata vermez, sessizce devam eder
                 System.Diagnostics.Debug.WriteLine($"Ses Çalma Hatası: {ex.Message}");
             }
         }
@@ -50,14 +47,9 @@ namespace Saller_System.Views
         {
             base.OnAppearing();
             if (await ZamanAsimKontrolAsync()) return;
-
             OturumServisi.AktiviteYenile();
-
             var magazaAdi = await _ayarlar.GetAsync("MagazaAdi", "");
-            MagazaAdiLabel.Text = string.IsNullOrWhiteSpace(magazaAdi)
-                ? "ÖZ BİGA ET"
-                : magazaAdi.ToUpper();
-
+            MagazaAdiLabel.Text = string.IsNullOrWhiteSpace(magazaAdi) ? "ÖZ BİGA ET" : magazaAdi.ToUpper();
             BarkodOkuyucu.IsDetecting = true;
             MesajBorder.IsVisible = false;
         }
@@ -71,7 +63,6 @@ namespace Saller_System.Views
         private async Task<bool> ZamanAsimKontrolAsync()
         {
             if (!OturumServisi.OturumSuresiDolduMu()) return false;
-
             OturumServisi.Cikis();
             await DisplayAlert("Oturum Süresi Doldu", "Güvenlik nedeniyle oturumunuz sonlandırıldı.", "Tamam");
             await Shell.Current.GoToAsync("//LoginPage");
@@ -88,7 +79,6 @@ namespace Saller_System.Views
                 OturumServisi.AktiviteYenile();
                 BarkodEntry.Text = result.Value;
                 BarkodOkuyucu.IsDetecting = false;
-
                 await UrunGetirAsync(result.Value);
             });
         }
@@ -96,14 +86,12 @@ namespace Saller_System.Views
         private async Task UrunGetirAsync(string okunanBarkod)
         {
             if (string.IsNullOrEmpty(okunanBarkod)) return;
-
             OturumServisi.AktiviteYenile();
             await _db.InitAsync();
 
             string aranacakBarkod = okunanBarkod;
             decimal okunanMiktar = 1;
             bool teraziUrunuMu = false;
-
             string prefix = await _ayarlar.GetAsync("TeraziPrefix", "27");
 
             if (okunanBarkod.Length == 13 && okunanBarkod.StartsWith(prefix))
@@ -116,64 +104,47 @@ namespace Saller_System.Views
 
             var urun = await _db.BarkodIleGetirAsync(aranacakBarkod);
 
-            if (urun == null && teraziUrunuMu)
-            {
-                urun = await _db.BarkodIleGetirAsync(aranacakBarkod.TrimStart('0'));
-            }
+            if (urun == null && teraziUrunuMu) urun = await _db.BarkodIleGetirAsync(aranacakBarkod.TrimStart('0'));
 
             if (urun != null)
             {
                 _bulunanUrun = urun;
 
-                // Ürün bulunduğunda "BİP" sesi çal
-                await BipCal();
-
                 if (urun.GramajliMi || teraziUrunuMu)
                 {
+                    // SES ÇIKMAZ: Sadece bilgiler gösterilir
                     UrunAdLabel.Text = urun.Ad;
                     UrunFiyatLabel.Text = $"Birim Fiyat: ₺{urun.KgFiyati:N2} / Kg";
                     UrunKategoriLabel.Text = $"Kategori: {urun.Kategori}";
                     AdetEntry.Text = okunanMiktar.ToString("0.###");
-
                     UrunBilgiFrame.IsVisible = true;
                     MesajBorder.IsVisible = false;
                 }
                 else
                 {
+                    // SES ÇIKAR: Çünkü direkt sepete ekleniyor
                     _sepet.Ekle(urun, 1, urun.Fiyat);
-
-                    // Başarılı işlem titreşimi
+                    await BipCal();
                     HapticFeedback.Default.Perform(HapticFeedbackType.Click);
-
                     MesajLabel.Text = $"✅ {urun.Ad} sepete eklendi!";
                     MesajBorder.IsVisible = true;
                     UrunBilgiFrame.IsVisible = false;
                     BarkodEntry.Text = "";
-
                     await Task.Delay(1000);
                     BarkodOkuyucu.IsDetecting = true;
                 }
             }
             else
             {
-                bool ekle = await DisplayAlert("Ürün Bulunamadı",
-                    $"'{okunanBarkod}' sistemde yok. Hemen eklemek ister misiniz?", "Evet", "Hayır");
-                if (ekle)
-                {
-                    UrunDuzenleServisi.HizliEkleBarkod = okunanBarkod;
-                    await Shell.Current.GoToAsync("//UrunListesi");
-                }
-                else
-                {
-                    BarkodOkuyucu.IsDetecting = true;
-                }
+                bool ekle = await DisplayAlert("Ürün Bulunamadı", $"'{okunanBarkod}' sistemde yok. Hemen eklemek ister misiniz?", "Evet", "Hayır");
+                if (ekle) { UrunDuzenleServisi.HizliEkleBarkod = okunanBarkod; await Shell.Current.GoToAsync("//UrunListesi"); }
+                else BarkodOkuyucu.IsDetecting = true;
             }
         }
 
         private async void SatisaEkleTapped(object sender, EventArgs e)
         {
             if (_bulunanUrun == null) return;
-
             OturumServisi.AktiviteYenile();
 
             decimal eklenecekFiyat = _bulunanUrun.GramajliMi ? _bulunanUrun.KgFiyati : _bulunanUrun.Fiyat;
@@ -181,7 +152,7 @@ namespace Saller_System.Views
 
             _sepet.Ekle(_bulunanUrun, girilenMiktar, eklenecekFiyat);
 
-            // Onay butonuna basıldığında da bir "BİP" daha çalsın
+            // SES ÇIKAR: Onay butonuna basıldı ve ürün sepete girdi
             await BipCal();
             HapticFeedback.Default.Perform(HapticFeedbackType.Click);
 
@@ -189,32 +160,12 @@ namespace Saller_System.Views
             MesajBorder.IsVisible = true;
             UrunBilgiFrame.IsVisible = false;
             BarkodEntry.Text = "";
-
             BarkodOkuyucu.IsDetecting = true;
         }
 
-        private async void UrunGetirTapped(object sender, EventArgs e)
-        {
-            OturumServisi.AktiviteYenile();
-            await UrunGetirAsync(BarkodEntry.Text);
-        }
-
-        private async void BarkodEntry_Completed(object sender, EventArgs e)
-        {
-            OturumServisi.AktiviteYenile();
-            await UrunGetirAsync(BarkodEntry.Text);
-        }
-
-        private async void GeriClicked(object sender, EventArgs e)
-        {
-            OturumServisi.AktiviteYenile();
-            await Shell.Current.GoToAsync("//AnaSayfa");
-        }
-
-        private async void SepeteGitClicked(object sender, EventArgs e)
-        {
-            OturumServisi.AktiviteYenile();
-            await Shell.Current.GoToAsync("//SepetSayfa");
-        }
+        private async void UrunGetirTapped(object sender, EventArgs e) { await UrunGetirAsync(BarkodEntry.Text); }
+        private async void BarkodEntry_Completed(object sender, EventArgs e) { await UrunGetirAsync(BarkodEntry.Text); }
+        private async void GeriClicked(object sender, EventArgs e) { await Shell.Current.GoToAsync("//AnaSayfa"); }
+        private async void SepeteGitClicked(object sender, EventArgs e) { await Shell.Current.GoToAsync("//SepetSayfa"); }
     }
 }

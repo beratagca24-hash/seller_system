@@ -14,6 +14,7 @@ namespace Saller_System.Services
             string dbPath = Path.Combine(FileSystem.AppDataDirectory, "saller.db");
             _db = new SQLiteAsyncConnection(dbPath);
 
+            // Tabloları oluşturuyoruz
             await _db.CreateTableAsync<Urun>();
             await _db.CreateTableAsync<Satis>();
             await _db.CreateTableAsync<FiyatGecmisi>();
@@ -22,8 +23,6 @@ namespace Saller_System.Services
             await _db.CreateTableAsync<Musteri>();
             await _db.CreateTableAsync<VeresiyeIslem>();
             await _db.CreateTableAsync<ToptanMusteri>();
-
-            // YENİ: Giderler Tablosu
             await _db.CreateTableAsync<Gider>();
 
             await VarsayilanKullanicilariOlusturAsync();
@@ -45,8 +44,14 @@ namespace Saller_System.Services
             return (kullanici != null && sifre == kullanici.Sifre) ? kullanici : null;
         }
 
+        // --- KULLANICI İŞLEMLERİ (KullaniciYonetimi.xaml için) ---
+        public async Task<List<Kullanici>> TumKullanicilariGetirAsync() => await _db!.Table<Kullanici>().ToListAsync();
+        public async Task KullaniciEkleAsync(Kullanici k) => await _db!.InsertAsync(k);
+        public async Task KullaniciSilAsync(Kullanici k) => await _db!.DeleteAsync(k);
+
         // --- ÜRÜN İŞLEMLERİ ---
         public async Task<List<Urun>> TumUrunleriGetirAsync() => await _db!.Table<Urun>().ToListAsync();
+        public async Task<Urun?> BarkodIleGetirAsync(string barkod) => await _db!.Table<Urun>().Where(u => u.Barkod == barkod).FirstOrDefaultAsync();
         public async Task<List<Urun>> UrunAraAsync(string aramaMetni, int sayfa = 0, int boyut = SayfaBoyutu)
         {
             var metin = aramaMetni.ToLower();
@@ -67,9 +72,31 @@ namespace Saller_System.Services
             });
         }
 
-        // --- SATIŞ VE CİRO İŞLEMLERİ ---
+        // FiyatGecmisiSayfa.xaml için gerekli metod
+        public async Task<List<FiyatGecmisi>> UrunFiyatGecmisiAsync(int urunId) => await _db!.Table<FiyatGecmisi>().Where(f => f.UrunId == urunId).OrderByDescending(f => f.Tarih).ToListAsync();
+
+        // --- SATIŞ VE ARŞİVLEME ---
         public async Task SatisKaydetAsync(Satis satis) => await _db!.InsertAsync(satis);
         public async Task SatisleriTopluKaydetAsync(IEnumerable<Satis> satisler) { await _db!.RunInTransactionAsync(db => { foreach (var s in satisler) db.Insert(s); }); }
+
+        // App.xaml.cs'deki arşivleme hatasını çözen metod
+        public async Task EskiSatisleriArsivleAsync()
+        {
+            var sinirTarih = DateTime.Now.AddDays(-30); // 30 günden eskiyi arşivle
+            var eskiSatislar = await _db!.Table<Satis>().Where(s => s.Tarih < sinirTarih).ToListAsync();
+            if (eskiSatislar.Any())
+            {
+                await _db.RunInTransactionAsync(db =>
+                {
+                    foreach (var s in eskiSatislar)
+                    {
+                        db.Insert(new ArsivedSatis { Barkod = s.Barkod, Ad = s.Ad, Fiyat = s.Fiyat, Adet = s.Adet, Tarih = s.Tarih, SatisTipi = s.SatisTipi });
+                        db.Delete(s);
+                    }
+                });
+            }
+        }
+
         public async Task<List<Satis>> TumSatisleriGetirAsync() => await _db!.Table<Satis>().OrderByDescending(s => s.Tarih).ToListAsync();
         public async Task<List<Satis>> GunlukSatislerAsync(DateTime tarih) { var b = tarih.Date; var bit = b.AddDays(1); return await _db!.Table<Satis>().Where(s => s.Tarih >= b && s.Tarih < bit).ToListAsync(); }
 
@@ -78,10 +105,8 @@ namespace Saller_System.Services
             var satislar = await GunlukSatislerAsync(tarih);
             return satislar.Where(s => s.SatisTipi != "TAHSILAT" && s.SatisTipi != "TOPTAN").Sum(s => s.Fiyat);
         }
-
         public async Task<decimal> GunlukKarAsync(DateTime tarih) => (await GunlukSatislerAsync(tarih)).Sum(s => s.Kar);
         public async Task<decimal> GunlukSatisSayisiAsync(DateTime tarih) => (await GunlukSatislerAsync(tarih)).Sum(s => s.Adet);
-
         public async Task<decimal> AylikCiroAsync(int yil, int ay)
         {
             var bas = new DateTime(yil, ay, 1); var bit = bas.AddMonths(1);
@@ -95,7 +120,7 @@ namespace Saller_System.Services
             return satislar.Sum(s => s.Kar);
         }
 
-        // --- GİDER İŞLEMLERİ (YENİ) ---
+        // --- GİDER İŞLEMLERİ ---
         public async Task GiderEkleAsync(Gider g) => await _db!.InsertAsync(g);
         public async Task<List<Gider>> GunlukGiderlerAsync(DateTime tarih) { var b = tarih.Date; var bit = b.AddDays(1); return await _db!.Table<Gider>().Where(g => g.Tarih >= b && g.Tarih < bit).ToListAsync(); }
         public async Task<decimal> GunlukGiderToplamiAsync(DateTime tarih) => (await GunlukGiderlerAsync(tarih)).Sum(g => g.Tutar);
@@ -114,7 +139,6 @@ namespace Saller_System.Services
         }
         public async Task<Musteri?> MusteriGetirAsync(int id) => await _db!.Table<Musteri>().Where(m => m.Id == id).FirstOrDefaultAsync();
         public async Task<List<VeresiyeIslem>> MusteriIslemleriGetirAsync(int musteriId) => await _db!.Table<VeresiyeIslem>().Where(i => i.MusteriId == musteriId).OrderByDescending(i => i.Tarih).ToListAsync();
-
         public async Task<List<ToptanMusteri>> TumToptanMusterileriGetirAsync() => await _db!.Table<ToptanMusteri>().ToListAsync();
         public async Task ToptanMusteriEkleAsync(ToptanMusteri m) => await _db!.InsertAsync(m);
         public async Task ToptanMusteriBorcEkleAsync(int musteriId, decimal tutar)

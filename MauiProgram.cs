@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Logging;
-using Plugin.Maui.Audio; // SES İÇİN
+using Plugin.Maui.Audio;
 using Saller_System.Services;
 using Saller_System.Views;
-using SkiaSharp.Views.Maui.Controls; // GRAFİK İÇİN
+using SkiaSharp.Views.Maui.Controls.Hosting; // DÜZELTİLDİ: .Hosting eklendi
 using ZXing.Net.Maui.Controls;
 
 namespace Saller_System
@@ -14,7 +14,7 @@ namespace Saller_System
             var builder = MauiApp.CreateBuilder();
             builder.UseMauiApp<App>()
                 .UseBarcodeReader()
-                .UseSkiaSharp() // Grafik motorunu aktif ettik
+                .UseSkiaSharp() // Grafik motoru artık aktif
                 .ConfigureFonts(fonts =>
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
@@ -26,10 +26,7 @@ namespace Saller_System
             builder.Services.AddSingleton<AyarlarServisi>();
             builder.Services.AddSingleton<SepetServisi>();
             builder.Services.AddSingleton<ExcelServisi>();
-
-            // SES MOTORU KAYDI: Sisteme ses çalma yeteneği kazandırır
             builder.Services.AddSingleton(AudioManager.Current);
-
             builder.Services.AddSingleton<App>();
 
             // --- SAYFALAR ---
@@ -57,7 +54,6 @@ namespace Saller_System
             builder.Logging.AddDebug();
 #endif
 
-            // Android alt çizgi ve karanlık mod ayarları
             Microsoft.Maui.Handlers.EntryHandler.Mapper.AppendToMapping("NoUnderline", (handler, view) =>
             {
 #if ANDROID
